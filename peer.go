@@ -29,10 +29,9 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	"github.com/sourcenetwork/corekv/namespace"
 	"github.com/sourcenetwork/corelog"
 	"github.com/sourcenetwork/immutable"
-
-	"github.com/sourcenetwork/go-p2p/config"
 )
 
 // Peer is a DefraDB Peer node which exposes all the LibP2P host/peer functionality
@@ -60,8 +59,7 @@ type Peer struct {
 // NewPeer creates a new instance of the DefraDB server as a peer-to-peer node.
 func NewPeer(
 	ctx context.Context,
-	blockstore Blockstore,
-	opts ...config.NodeOpt,
+	opts ...NodeOpt,
 ) (p *Peer, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
@@ -72,9 +70,19 @@ func NewPeer(
 		}
 	}()
 
-	options := config.DefaultOptions()
+	options := DefaultOptions()
 	for _, opt := range opts {
 		opt(options)
+	}
+
+	if !options.Blockstore.HasValue() {
+		if !options.Rootstore.HasValue() {
+			return nil, ErrBlockstoreOrRootRequired
+		}
+
+		store := namespace.Wrap(options.Rootstore.Value(), []byte(options.BlockstoreNamespace))
+		blockstore := newBlockstore(store)
+		options.Blockstore = immutable.Some[Blockstore](blockstore)
 	}
 
 	peers := make([]peer.AddrInfo, len(options.BootstrapPeers))
@@ -119,8 +127,8 @@ func NewPeer(
 	}
 
 	bswapnet := bsnet.NewFromIpfsHost(h)
-	bswap := bitswap.New(ctx, bswapnet, ddht, blockstore, bitswap.WithPeerBlockRequestFilter(p.hasAccess))
-	p.blockService = blockservice.New(blockstore, bswap)
+	bswap := bitswap.New(ctx, bswapnet, ddht, options.Blockstore.Value(), bitswap.WithPeerBlockRequestFilter(p.hasAccess))
+	p.blockService = blockservice.New(options.Blockstore.Value(), bswap)
 
 	p.bootCloser, err = bootstrap.Bootstrap(h.ID(), h, ddht, bootstrap.BootstrapConfigWithPeers(peers))
 	if err != nil {

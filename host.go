@@ -34,12 +34,10 @@ import (
 
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
 	"github.com/sourcenetwork/immutable"
-
-	"github.com/sourcenetwork/go-p2p/config"
 )
 
 // setupHost returns a host and router configured with the given options.
-func setupHost(ctx context.Context, options *config.Options) (host.Host, *dualdht.DHT, error) {
+func setupHost(ctx context.Context, options *Options) (host.Host, *dualdht.DHT, error) {
 	connManager, err := connmgr.NewConnManager(100, 400, connmgr.WithGracePeriod(time.Second*20))
 	if err != nil {
 		return nil, nil, err

@@ -12,7 +12,12 @@
 
 /* Node configuration, in which NodeOpt functions are applied on Options. */
 
-package config
+package p2p
+
+import (
+	"github.com/sourcenetwork/corekv"
+	"github.com/sourcenetwork/immutable"
+)
 
 // Options is the node options.
 type Options struct {
@@ -21,14 +26,19 @@ type Options struct {
 	EnablePubSub    bool
 	EnableRelay     bool
 	BootstrapPeers  []string
+
+	Blockstore          immutable.Option[Blockstore]
+	Rootstore           immutable.Option[corekv.ReaderWriter]
+	BlockstoreNamespace string
 }
 
 // DefaultOptions returns the default net options.
 func DefaultOptions() *Options {
 	return &Options{
-		ListenAddresses: []string{"/ip4/0.0.0.0/tcp/9171"},
-		EnablePubSub:    true,
-		EnableRelay:     false,
+		ListenAddresses:     []string{"/ip4/0.0.0.0/tcp/9171"},
+		EnablePubSub:        true,
+		EnableRelay:         false,
+		BlockstoreNamespace: "/blocks",
 	}
 }
 
@@ -66,5 +76,33 @@ func WithListenAddresses(addresses ...string) NodeOpt {
 func WithBootstrapPeers(peers ...string) NodeOpt {
 	return func(opt *Options) {
 		opt.BootstrapPeers = peers
+	}
+}
+
+// WithBootstrapPeers sets the backing blockstore that the Peer will use to send/receive/store blocks.
+//
+// Providing either Blockstore or Rootstore is required.
+func WithBlockstore(blockstore Blockstore) NodeOpt {
+	return func(opt *Options) {
+		opt.Blockstore = immutable.Some(blockstore)
+	}
+}
+
+// WithRootstore sets the backing store that the Peer will use to send/receive/store blocks.
+//
+// Providing either Blockstore or Rootstore is required.
+func WithRootstore(root corekv.ReaderWriter) NodeOpt {
+	return func(opt *Options) {
+		opt.Rootstore = immutable.Some(root)
+	}
+}
+
+// WithBlockstoreNamespace sets the namespace within the provided Rootstore that the Peer
+// will use to send/receive/store blocks.
+//
+// If Rootstore is not provided this option has no impact.
+func WithBlockstoreNamespace(path string) NodeOpt {
+	return func(opt *Options) {
+		opt.BlockstoreNamespace = path
 	}
 }
