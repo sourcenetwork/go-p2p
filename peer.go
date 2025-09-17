@@ -30,6 +30,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/routing"
 
+	ckvbs "github.com/sourcenetwork/corekv/blockstore"
 	"github.com/sourcenetwork/corekv/namespace"
 	"github.com/sourcenetwork/corelog"
 	"github.com/sourcenetwork/immutable"
@@ -82,7 +83,7 @@ func NewPeer(
 		}
 
 		store := namespace.Wrap(options.Rootstore.Value(), []byte(options.BlockstoreNamespace))
-		bs := NewBlockstore(store)
+		bs := ckvbs.NewBlockstore(store)
 		options.Blockstore = immutable.Some[blockstore.Blockstore](bs)
 	}
 
