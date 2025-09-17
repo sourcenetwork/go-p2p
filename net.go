@@ -15,5 +15,5 @@ package p2p
 import "github.com/sourcenetwork/corelog"
 
 var (
-	log = corelog.NewLogger("net")
+	log = corelog.NewLogger("p2p")
 )
