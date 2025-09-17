@@ -15,6 +15,7 @@
 package p2p
 
 import (
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/sourcenetwork/corekv"
 	"github.com/sourcenetwork/immutable"
 )
@@ -27,7 +28,7 @@ type Options struct {
 	EnableRelay     bool
 	BootstrapPeers  []string
 
-	Blockstore          immutable.Option[Blockstore]
+	Blockstore          immutable.Option[blockstore.Blockstore]
 	Rootstore           immutable.Option[corekv.ReaderWriter]
 	BlockstoreNamespace string
 }
@@ -82,7 +83,7 @@ func WithBootstrapPeers(peers ...string) NodeOpt {
 // WithBootstrapPeers sets the backing blockstore that the Peer will use to send/receive/store blocks.
 //
 // Providing either Blockstore or Rootstore is required.
-func WithBlockstore(blockstore Blockstore) NodeOpt {
+func WithBlockstore(blockstore blockstore.Blockstore) NodeOpt {
 	return func(opt *Options) {
 		opt.Blockstore = immutable.Some(blockstore)
 	}

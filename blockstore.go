@@ -25,34 +25,29 @@ import (
 	"github.com/sourcenetwork/corekv"
 )
 
-// Blockstore proxies the ipld.DAGService under the /core namespace for future-proofing
-type Blockstore interface {
-	blockstore.Blockstore
-}
-
 // NewBlockstore returns a default Blockstore implementation
 // using the provided datastore.Batching backend.
-func newBlockstore(store corekv.ReaderWriter) *bstore {
-	return &bstore{
+func NewBlockstore(store corekv.ReaderWriter) *Blockstore {
+	return &Blockstore{
 		store: store,
 	}
 }
 
-type bstore struct {
+type Blockstore struct {
 	store corekv.ReaderWriter
 
 	rehash bool
 }
 
-var _ Blockstore = (*bstore)(nil)
+var _ blockstore.Blockstore = (*Blockstore)(nil)
 
 // HashOnRead enables or disables rehashing of blocks on read.
-func (bs *bstore) HashOnRead(enabled bool) {
+func (bs *Blockstore) HashOnRead(enabled bool) {
 	bs.rehash = enabled
 }
 
 // Get returns a block from the blockstore.
-func (bs *bstore) Get(ctx context.Context, k cid.Cid) (blocks.Block, error) {
+func (bs *Blockstore) Get(ctx context.Context, k cid.Cid) (blocks.Block, error) {
 	if !k.Defined() {
 		return nil, ipld.ErrNotFound{Cid: k}
 	}
@@ -79,7 +74,7 @@ func (bs *bstore) Get(ctx context.Context, k cid.Cid) (blocks.Block, error) {
 }
 
 // Put stores a block to the blockstore.
-func (bs *bstore) Put(ctx context.Context, block blocks.Block) error {
+func (bs *Blockstore) Put(ctx context.Context, block blocks.Block) error {
 	k := block.Cid().Bytes()
 
 	// Has is cheaper than Set, so see if we already have it
@@ -92,7 +87,7 @@ func (bs *bstore) Put(ctx context.Context, block blocks.Block) error {
 }
 
 // PutMany stores multiple blocks to the blockstore.
-func (bs *bstore) PutMany(ctx context.Context, blocks []blocks.Block) error {
+func (bs *Blockstore) PutMany(ctx context.Context, blocks []blocks.Block) error {
 	for _, b := range blocks {
 		k := b.Cid().Bytes()
 		exists, err := bs.store.Has(ctx, k)
@@ -109,12 +104,12 @@ func (bs *bstore) PutMany(ctx context.Context, blocks []blocks.Block) error {
 }
 
 // Has returns whether a block is stored in the blockstore.
-func (bs *bstore) Has(ctx context.Context, k cid.Cid) (bool, error) {
+func (bs *Blockstore) Has(ctx context.Context, k cid.Cid) (bool, error) {
 	return bs.store.Has(ctx, k.Bytes())
 }
 
 // GetSize returns the size of a block in the blockstore.
-func (bs *bstore) GetSize(ctx context.Context, k cid.Cid) (int, error) {
+func (bs *Blockstore) GetSize(ctx context.Context, k cid.Cid) (int, error) {
 	buf, err := bs.store.Get(ctx, k.Bytes())
 	if errors.Is(err, corekv.ErrNotFound) {
 		return -1, ipld.ErrNotFound{Cid: k}
@@ -123,7 +118,7 @@ func (bs *bstore) GetSize(ctx context.Context, k cid.Cid) (int, error) {
 }
 
 // DeleteBlock removes a block from the blockstore.
-func (bs *bstore) DeleteBlock(ctx context.Context, k cid.Cid) error {
+func (bs *Blockstore) DeleteBlock(ctx context.Context, k cid.Cid) error {
 	return bs.store.Delete(ctx, k.Bytes())
 }
 
@@ -132,7 +127,7 @@ func (bs *bstore) DeleteBlock(ctx context.Context, k cid.Cid) error {
 // AllKeysChan respects context.
 //
 // TODO this is very simplistic, in the future, take dsq.Query as a param?
-func (bs *bstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
+func (bs *Blockstore) AllKeysChan(ctx context.Context) (<-chan cid.Cid, error) {
 	// KeysOnly, because that would be _a lot_ of data.
 	iter, err := bs.store.Iterator(ctx, corekv.IterOptions{
 		KeysOnly: true,

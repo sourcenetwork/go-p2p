@@ -21,6 +21,7 @@ import (
 	"github.com/ipfs/boxo/bitswap"
 	"github.com/ipfs/boxo/bitswap/network/bsnet"
 	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/bootstrap"
 	"github.com/ipfs/go-cid"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -81,8 +82,8 @@ func NewPeer(
 		}
 
 		store := namespace.Wrap(options.Rootstore.Value(), []byte(options.BlockstoreNamespace))
-		blockstore := newBlockstore(store)
-		options.Blockstore = immutable.Some[Blockstore](blockstore)
+		bs := NewBlockstore(store)
+		options.Blockstore = immutable.Some[blockstore.Blockstore](bs)
 	}
 
 	peers := make([]peer.AddrInfo, len(options.BootstrapPeers))
