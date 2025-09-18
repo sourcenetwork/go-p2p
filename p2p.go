@@ -18,6 +18,11 @@ import (
 	"io"
 
 	"github.com/ipfs/go-cid"
+	"github.com/sourcenetwork/corelog"
+)
+
+var (
+	log = corelog.NewLogger("p2p")
 )
 
 type StreamHandler = func(stream io.Reader, peerID string)
