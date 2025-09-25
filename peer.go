@@ -139,16 +139,11 @@ func NewPeer(
 
 	for _, peer := range peers {
 		// We try to connect to bootstrap peers.
-		addrs := make([]string, len(peer.Addrs))
-		for i, addr := range peer.Addrs {
-			addrs[i] = addr.String()
-		}
 		// We can ignore the error as the peer might be offline and that is ok.
-		_ = p.Connect(ctx, peer.ID.String(), addrs)
+		_ = p.connect(ctx, peer)
 	}
 
-	// There is a possibility for the PeerInfo event to trigger before the PeerInfo has been set for the host.
-	// To avoid this, we wait for the host to indicate that its local address has been updated.
+	// To ensure we have a full address, we wait for the host to indicate that its local address has been updated.
 	sub, err := h.EventBus().Subscribe(&libp2pevent.EvtLocalAddressesUpdated{})
 	if err != nil {
 		return nil, err

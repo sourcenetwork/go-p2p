@@ -47,7 +47,9 @@ func TestStart_WithKnownPeer_NoError(t *testing.T) {
 	require.NoError(t, err)
 	defer n2.Close()
 
-	err = n2.Connect(ctx, n1.PeerInfo().ID, n1.PeerInfo().Addresses)
+	addrs, err := n1.Addresses()
+	require.NoError(t, err)
+	err = n2.Connect(ctx, addrs)
 	require.NoError(t, err)
 }
 
@@ -110,7 +112,11 @@ func TestListenAddrs_WithListenAddresses_NoError(t *testing.T) {
 		WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
 	)
 	require.NoError(t, err)
-	require.Contains(t, n.Addrs()[0], "/tcp/")
+	addrs, err := n.Addresses()
+	require.NoError(t, err)
+	require.NotEmpty(t, addrs)
+	// ensure we have a tcp addr
+	require.Contains(t, addrs[0], "/tcp/")
 	n.Close()
 }
 

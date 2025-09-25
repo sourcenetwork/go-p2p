@@ -14,7 +14,6 @@ package p2p
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -28,16 +27,6 @@ var (
 type StreamHandler = func(stream io.Reader, peerID string)
 type PubsubMessageHandler = func(from string, topic string, msg []byte) ([]byte, error)
 type BlockAccessFunc = func(ctx context.Context, peerID string, c cid.Cid) bool
-
-type PeerInfo struct {
-	ID        string
-	Addresses []string
-}
-
-func (p PeerInfo) String() string {
-	b, _ := json.Marshal(p)
-	return string(b)
-}
 
 type PubsubResponse struct {
 	// ID is the cid.Cid of the received message.
