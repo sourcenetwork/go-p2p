@@ -17,6 +17,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipld/go-ipld-prime/storage/bsrvadapter"
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -273,8 +274,14 @@ func (p *Peer) publishToTopic(
 	return nil, p.publishDirectToTopic(ctx, topic, data, false)
 }
 
+// IPLDStore returns the a wrapped blockservice.BlockService that implements the blockstore.IPLDStore interface.
 func (p *Peer) IPLDStore() blockstore.IPLDStore {
 	return &bsrvadapter.Adapter{Wrapped: p.blockService}
+}
+
+// ContextWithSession returns a context with a session for the blockservice.
+func (p *Peer) ContextWithSession(ctx context.Context) context.Context {
+	return blockservice.ContextWithSession(ctx, p.blockService)
 }
 
 func (p *Peer) SetBlockAccessFunc(accessFunc BlockAccessFunc) {
