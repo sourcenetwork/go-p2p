@@ -5,15 +5,16 @@ go 1.24.6
 require (
 	github.com/ipfs/boxo v0.34.0
 	github.com/ipfs/go-cid v0.5.0
+	github.com/ipld/go-ipld-prime/storage/bsrvadapter v0.0.0-20250821084354-a425e60cd714
 	github.com/libp2p/go-libp2p v0.43.0
 	github.com/libp2p/go-libp2p-kad-dht v0.34.0
 	github.com/libp2p/go-libp2p-pubsub v0.14.2
 	github.com/libp2p/go-libp2p-record v0.3.1
 	github.com/multiformats/go-multiaddr v0.16.1
-	github.com/sourcenetwork/corekv v0.2.0
-	github.com/sourcenetwork/corekv/blockstore v0.0.0-20250917232726-9384d90f13b5
-	github.com/sourcenetwork/corekv/memory v0.0.0-20250917232726-9384d90f13b5
-	github.com/sourcenetwork/corekv/namespace v0.0.0-20250917232726-9384d90f13b5
+	github.com/sourcenetwork/corekv v0.2.2
+	github.com/sourcenetwork/corekv/blockstore v0.2.2
+	github.com/sourcenetwork/corekv/memory v0.2.2
+	github.com/sourcenetwork/corekv/namespace v0.2.1
 	github.com/sourcenetwork/corelog v0.0.8
 	github.com/sourcenetwork/go-libp2p-pubsub-rpc v0.0.14
 	github.com/sourcenetwork/immutable v0.3.0
@@ -54,6 +55,7 @@ require (
 	github.com/ipfs/go-peertaskqueue v0.8.2 // indirect
 	github.com/ipfs/kubo v0.25.0 // indirect
 	github.com/ipld/go-ipld-prime v0.21.0 // indirect
+	github.com/ipld/go-ipld-prime/storage/bsadapter v0.0.0-20250821084354-a425e60cd714 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ipfs/boxo/blockservice"
+	"github.com/ipld/go-ipld-prime/storage/bsrvadapter"
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dualdht "github.com/libp2p/go-libp2p-kad-dht/dual"
@@ -32,6 +33,7 @@ import (
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	ma "github.com/multiformats/go-multiaddr"
 
+	"github.com/sourcenetwork/corekv/blockstore"
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
 	"github.com/sourcenetwork/immutable"
 )
@@ -87,7 +89,7 @@ func (p *Peer) ID() string {
 	return p.host.ID().String()
 }
 
-// Addrs returns the full multiaddresses (with peer ID) of the host.
+// Addresses returns the full multiaddresses (with peer ID) of the host.
 //
 // If the host has no listen addresses, it will return just the /p2p/<PeerID> address.
 func (p *Peer) Addresses() ([]string, error) {
@@ -272,8 +274,14 @@ func (p *Peer) publishToTopic(
 	return nil, p.publishDirectToTopic(ctx, topic, data, false)
 }
 
-func (p *Peer) BlockService() blockservice.BlockService {
-	return p.blockService
+// IPLDStore returns the a wrapped blockservice.BlockService that implements the blockstore.IPLDStore interface.
+func (p *Peer) IPLDStore() blockstore.IPLDStore {
+	return &bsrvadapter.Adapter{Wrapped: p.blockService}
+}
+
+// ContextWithSession returns a context with a session for the blockservice.
+func (p *Peer) ContextWithSession(ctx context.Context) context.Context {
+	return blockservice.ContextWithSession(ctx, p.blockService)
 }
 
 func (p *Peer) SetBlockAccessFunc(accessFunc BlockAccessFunc) {
