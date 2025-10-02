@@ -87,30 +87,34 @@ func (p *Peer) ID() string {
 	return p.host.ID().String()
 }
 
-func (p *Peer) Addrs() []string {
+// Addrs returns the full multiaddresses (with peer ID) of the host.
+//
+// If the host has no listen addresses, it will return just the /p2p/<PeerID> address.
+func (p *Peer) Addresses() ([]string, error) {
 	addrs := []string{}
+	p2ppart, err := ma.NewComponent("p2p", p.host.ID().String())
+	if err != nil {
+		return nil, err
+	}
+	if len(p.host.Addrs()) == 0 {
+		addrs = append(addrs, p2ppart.String())
+		return addrs, nil
+	}
 	for _, addr := range p.host.Addrs() {
-		addrs = append(addrs, addr.String())
+		addrs = append(addrs, addr.Encapsulate(p2ppart).String())
 	}
-	return addrs
-}
-
-func (p *Peer) PeerInfo() PeerInfo {
-	return PeerInfo{
-		ID:        p.ID(),
-		Addresses: p.Addrs(),
-	}
+	return addrs, nil
 }
 
 func (p *Peer) Pubkey() ([]byte, error) {
 	return crypto.MarshalPublicKey(p.host.Peerstore().PubKey(p.host.ID()))
 }
 
-func (p *Peer) Connect(ctx context.Context, id string, addresses []string) error {
-	peerID, err := peer.Decode(id)
-	if err != nil {
-		return err
-	}
+// Connect connects to a peer with the given addresses. If the list of addresses
+// represents multiple peers, it will try to connect to all of them.
+//
+// Addresses should be in multiaddr format (e.g. /ip4/127.0.0.1/tcp/4001/p2p/<PeerID>).
+func (p *Peer) Connect(ctx context.Context, addresses []string) error {
 	addrs := []ma.Multiaddr{}
 	for _, addr := range addresses {
 		maddr, err := ma.NewMultiaddr(addr)
@@ -119,12 +123,24 @@ func (p *Peer) Connect(ctx context.Context, id string, addresses []string) error
 		}
 		addrs = append(addrs, maddr)
 	}
-
-	addrInfo := peer.AddrInfo{
-		ID:    peerID,
-		Addrs: addrs,
+	addrInfos, err := peer.AddrInfosFromP2pAddrs(addrs...)
+	if err != nil {
+		return err
 	}
-	p.host.Peerstore().AddAddrs(peerID, addrs, peerstore.PermanentAddrTTL)
+	if len(addrInfos) == 0 {
+		return errors.New("no valid addresses to connect to")
+	}
+	for _, addrInfo := range addrInfos {
+		err = p.connect(ctx, addrInfo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (p *Peer) connect(ctx context.Context, addrInfo peer.AddrInfo) error {
+	p.host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.PermanentAddrTTL)
 	return p.host.Connect(ctx, addrInfo)
 }
 
