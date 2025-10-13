@@ -29,6 +29,7 @@ type Options struct {
 	BootstrapPeers  []string
 
 	Blockstore          immutable.Option[blockstore.Blockstore]
+	BlockstoreChunksize immutable.Option[int]
 	Rootstore           immutable.Option[corekv.ReaderWriter]
 	BlockstoreNamespace string
 }
@@ -105,5 +106,18 @@ func WithRootstore(root corekv.ReaderWriter) NodeOpt {
 func WithBlockstoreNamespace(path string) NodeOpt {
 	return func(opt *Options) {
 		opt.BlockstoreNamespace = path
+	}
+}
+
+// WithBlockstoreChunksize will wrap the blockstore in a chunkstore with the given chunksize.
+//
+// This allows the store to hold values of indefinate size, even if the underlying
+// corekv store does not support it (such as badger in-memory store).
+//
+// Setting this to true will reduce read-write speed, but will not affect the running
+// of lenses, only their storage and P2P efficiency.
+func WithBlockstoreChunksize(blockstoreChunksize int) NodeOpt {
+	return func(opts *Options) {
+		opts.BlockstoreChunksize = immutable.Some(blockstoreChunksize)
 	}
 }

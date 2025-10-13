@@ -13,6 +13,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/sourcenetwork/corekv v0.2.2
 	github.com/sourcenetwork/corekv/blockstore v0.2.2
+	github.com/sourcenetwork/corekv/chunk v0.0.0
 	github.com/sourcenetwork/corekv/memory v0.2.2
 	github.com/sourcenetwork/corekv/namespace v0.2.1
 	github.com/sourcenetwork/corelog v0.0.8
@@ -147,3 +148,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+replace github.com/sourcenetwork/corekv/chunk v0.0.0 => ../corekv/chunk
