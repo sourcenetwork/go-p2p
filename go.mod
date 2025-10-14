@@ -11,10 +11,11 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.14.2
 	github.com/libp2p/go-libp2p-record v0.3.1
 	github.com/multiformats/go-multiaddr v0.16.1
-	github.com/sourcenetwork/corekv v0.2.2
-	github.com/sourcenetwork/corekv/blockstore v0.2.2
-	github.com/sourcenetwork/corekv/memory v0.2.2
-	github.com/sourcenetwork/corekv/namespace v0.2.1
+	github.com/sourcenetwork/corekv v0.2.4
+	github.com/sourcenetwork/corekv/blockstore v0.2.4
+	github.com/sourcenetwork/corekv/chunk v0.2.4
+	github.com/sourcenetwork/corekv/memory v0.2.4
+	github.com/sourcenetwork/corekv/namespace v0.2.4
 	github.com/sourcenetwork/corelog v0.0.8
 	github.com/sourcenetwork/go-libp2p-pubsub-rpc v0.0.14
 	github.com/sourcenetwork/immutable v0.3.0
