@@ -86,8 +86,8 @@ func NewPeer(
 
 		var store corekv.ReaderWriter = namespace.Wrap(options.Rootstore.Value(), []byte(options.BlockstoreNamespace))
 
-		if options.BlockstoreChunksize.HasValue() {
-			store, err = chunk.New(ctx, store, options.BlockstoreChunksize.Value())
+		if options.BlockstoreChunkSize.HasValue() {
+			store, err = chunk.New(ctx, store, options.BlockstoreChunkSize.Value())
 			if err != nil {
 				return nil, err
 			}
