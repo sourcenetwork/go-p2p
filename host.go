@@ -112,6 +112,29 @@ func (p *Peer) Pubkey() ([]byte, error) {
 	return crypto.MarshalPublicKey(p.host.Peerstore().PubKey(p.host.ID()))
 }
 
+// ActivePeers returns the addresses of peers that are currently connected to.
+//
+// Addresses are returned in the multiaddr format (e.g. /ip4/127.0.0.1/tcp/4001/p2p/<PeerID>).
+func (p *Peer) ActivePeers() ([]string, error) {
+	addresses := []string{}
+
+	for _, con := range p.host.Network().Conns() {
+		pid := con.RemotePeer()
+		address := con.RemoteMultiaddr()
+
+		p2ppart, err := ma.NewComponent("p2p", pid.String())
+		if err != nil {
+			return nil, err
+		}
+
+		address = address.Encapsulate(p2ppart)
+
+		addresses = append(addresses, address.String())
+	}
+
+	return addresses, nil
+}
+
 // Connect connects to a peer with the given addresses. If the list of addresses
 // represents multiple peers, it will try to connect to all of them.
 //
