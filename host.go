@@ -219,7 +219,6 @@ func (p *Peer) AddPubSubTopic(
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
 		return handler(from.String(), topic, msg)
 	}
-	// Extract options - opts can contain PeerEventHandler directly
 	var internalOpts []TopicOption
 	for _, opt := range opts {
 		if h, ok := opt.(PeerEventHandler); ok {
