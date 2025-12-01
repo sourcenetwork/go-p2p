@@ -26,6 +26,7 @@ var (
 
 type StreamHandler = func(stream io.Reader, peerID string)
 type PubsubMessageHandler = func(from string, topic string, msg []byte) ([]byte, error)
+type PeerEventHandler = func(peerID string, topic string, joined bool)
 type BlockAccessFunc = func(ctx context.Context, peerID string, c cid.Cid) bool
 
 type PubsubResponse = struct {

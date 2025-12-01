@@ -210,11 +210,23 @@ func (p *Peer) SetStreamHandler(protocolID string, handler StreamHandler) {
 	})
 }
 
-func (p *Peer) AddPubSubTopic(topicName string, subscribe bool, handler PubsubMessageHandler) error {
+func (p *Peer) AddPubSubTopic(
+	topicName string,
+	subscribe bool,
+	handler PubsubMessageHandler,
+	opts ...any,
+) error {
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
 		return handler(from.String(), topic, msg)
 	}
-	_, err := p.addPubSubTopic(topicName, subscribe, messageHandler)
+	// Extract options - opts can contain PeerEventHandler directly
+	var internalOpts []TopicOption
+	for _, opt := range opts {
+		if h, ok := opt.(PeerEventHandler); ok {
+			internalOpts = append(internalOpts, WithEventHandler(h))
+		}
+	}
+	_, err := p.addPubSubTopic(topicName, subscribe, messageHandler, internalOpts...)
 	return err
 }
 
