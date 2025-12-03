@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/sourcenetwork/corelog"
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
 )
@@ -29,24 +28,6 @@ type pubsubTopic struct {
 	subscribed bool
 }
 
-// topicOptions holds configuration for pubsub topic creation.
-type topicOptions struct {
-	eventHandler rpc.EventHandler
-}
-
-// TopicOption is a function that configures topic options.
-type TopicOption func(*topicOptions)
-
-// WithEventHandler sets an event handler for the topic that will be called when peers join or leave.
-func WithEventHandler(handler PeerEventHandler) TopicOption {
-	return func(opts *topicOptions) {
-		opts.eventHandler = func(from peer.ID, topic string, msg []byte) {
-			// only 2 values are expected: "JOINED" and "LEFT"
-			handler(from.String(), topic, string(msg) == "JOINED")
-		}
-	}
-}
-
 // addPubSubTopic subscribes to a topic on the pubsub network
 // A custom message handler can be provided to handle incoming messages. If not provided,
 // the default message handler will be used.
@@ -54,7 +35,7 @@ func (p *Peer) addPubSubTopic(
 	topic string,
 	subscribe bool,
 	handler rpc.MessageHandler,
-	opts ...TopicOption,
+	eventHandler rpc.EventHandler,
 ) (pubsubTopic, error) {
 	if p.ps == nil {
 		return pubsubTopic{}, nil
@@ -62,11 +43,6 @@ func (p *Peer) addPubSubTopic(
 
 	if handler == nil {
 		return pubsubTopic{}, fmt.Errorf("handler cannot be nil")
-	}
-
-	options := &topicOptions{}
-	for _, opt := range opts {
-		opt(options)
 	}
 
 	log.InfoContext(p.ctx, "Adding pubsub topic",
@@ -92,8 +68,8 @@ func (p *Peer) addPubSubTopic(
 		return pubsubTopic{}, err
 	}
 
-	if options.eventHandler != nil {
-		t.SetEventHandler(options.eventHandler)
+	if eventHandler != nil {
+		t.SetEventHandler(eventHandler)
 	}
 	t.SetMessageHandler(handler)
 	pst := pubsubTopic{
