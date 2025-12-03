@@ -226,8 +226,12 @@ func (p *Peer) AddPubSubTopic(
 	var eventHandlerWrapper func(from peer.ID, topic string, msg []byte)
 	if eventHandler != nil {
 		eventHandlerWrapper = func(from peer.ID, topic string, msg []byte) {
-			// msg is either "JOINED" or "LEFT" - true if joined, false if left
-			eventHandler(from.String(), topic, string(msg) == "JOINED")
+			// msg is either "JOINED" or "LEFT" indicating the event type
+			eventType := PeerLeftTopic
+			if string(msg) == "JOINED" {
+				eventType = PeerJoinedTopic
+			}
+			eventHandler(from.String(), topic, eventType)
 		}
 	}
 	_, err := p.addPubSubTopic(topicName, subscribe, messageHandler, eventHandlerWrapper)
