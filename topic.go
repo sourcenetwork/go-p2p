@@ -31,7 +31,12 @@ type pubsubTopic struct {
 // addPubSubTopic subscribes to a topic on the pubsub network
 // A custom message handler can be provided to handle incoming messages. If not provided,
 // the default message handler will be used.
-func (p *Peer) addPubSubTopic(topic string, subscribe bool, handler rpc.MessageHandler) (pubsubTopic, error) {
+func (p *Peer) addPubSubTopic(
+	topic string,
+	subscribe bool,
+	handler rpc.MessageHandler,
+	eventHandler rpc.EventHandler,
+) (pubsubTopic, error) {
 	if p.ps == nil {
 		return pubsubTopic{}, nil
 	}
@@ -63,6 +68,9 @@ func (p *Peer) addPubSubTopic(topic string, subscribe bool, handler rpc.MessageH
 		return pubsubTopic{}, err
 	}
 
+	if eventHandler != nil {
+		t.SetEventHandler(eventHandler)
+	}
 	t.SetMessageHandler(handler)
 	pst := pubsubTopic{
 		Topic:      t,

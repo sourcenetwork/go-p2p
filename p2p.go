@@ -24,8 +24,15 @@ var (
 	log = corelog.NewLogger("p2p")
 )
 
+// PeerEventType represents the type of event for a peer in a pubsub topic.
+type PeerEventType = string
+
 type StreamHandler = func(stream io.Reader, peerID string)
 type PubsubMessageHandler = func(from string, topic string, msg []byte) ([]byte, error)
+
+// PeerEventHandler is called when a peer event happened on a pubsub topic.
+// Currently, there are two types of events: "JOINED" and "LEFT".
+type PeerEventHandler = func(peerID string, topic string, eventType PeerEventType)
 type BlockAccessFunc = func(ctx context.Context, peerID string, c cid.Cid) bool
 
 type PubsubResponse = struct {

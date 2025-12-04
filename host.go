@@ -210,11 +210,26 @@ func (p *Peer) SetStreamHandler(protocolID string, handler StreamHandler) {
 	})
 }
 
-func (p *Peer) AddPubSubTopic(topicName string, subscribe bool, handler PubsubMessageHandler) error {
+// AddPubSubTopic registers a new pubsub topic with the given name.
+// If subscribe is true, the peer will subscribe to the topic and receive messages.
+// The handler is called for each incoming message on the topic.
+// The eventHandler, if not nil, is called when peers join or leave the topic.
+func (p *Peer) AddPubSubTopic(
+	topicName string,
+	subscribe bool,
+	handler PubsubMessageHandler,
+	eventHandler PeerEventHandler,
+) error {
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
 		return handler(from.String(), topic, msg)
 	}
-	_, err := p.addPubSubTopic(topicName, subscribe, messageHandler)
+	var eventHandlerWrapper func(from peer.ID, topic string, msg []byte)
+	if eventHandler != nil {
+		eventHandlerWrapper = func(from peer.ID, topic string, msg []byte) {
+			eventHandler(from.String(), topic, string(msg))
+		}
+	}
+	_, err := p.addPubSubTopic(topicName, subscribe, messageHandler, eventHandlerWrapper)
 	return err
 }
 
