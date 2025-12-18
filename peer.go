@@ -58,6 +58,9 @@ type Peer struct {
 
 	blockAccessFunc immutable.Option[BlockAccessFunc]
 	accessFuncMu    sync.Mutex
+
+	// clearBackoffOnRetry enables clearing dial backoff when retrying connections
+	clearBackoffOnRetry bool
 }
 
 // NewPeer creates a new instance of the DefraDB server as a peer-to-peer node.
@@ -119,11 +122,12 @@ func NewPeer(
 	)
 
 	p = &Peer{
-		host:   h,
-		dht:    ddht,
-		ctx:    ctx,
-		cancel: cancel,
-		topics: make(map[string]pubsubTopic),
+		host:                h,
+		dht:                 ddht,
+		ctx:                 ctx,
+		cancel:              cancel,
+		topics:              make(map[string]pubsubTopic),
+		clearBackoffOnRetry: options.ClearBackoffOnRetry,
 	}
 
 	if options.EnablePubSub {
