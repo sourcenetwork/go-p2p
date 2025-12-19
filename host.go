@@ -31,6 +31,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	ma "github.com/multiformats/go-multiaddr"
 
 	"github.com/sourcenetwork/corekv/blockstore"
@@ -166,6 +167,13 @@ func (p *Peer) Connect(ctx context.Context, addresses []string) error {
 
 func (p *Peer) connect(ctx context.Context, addrInfo peer.AddrInfo) error {
 	p.host.Peerstore().AddAddrs(addrInfo.ID, addrInfo.Addrs, peerstore.PermanentAddrTTL)
+
+	if p.clearBackoffOnRetry {
+		if sw, ok := p.host.Network().(*swarm.Swarm); ok {
+			sw.Backoff().Clear(addrInfo.ID)
+		}
+	}
+
 	return p.host.Connect(ctx, addrInfo)
 }
 

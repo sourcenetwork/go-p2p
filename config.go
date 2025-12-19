@@ -32,6 +32,10 @@ type Options struct {
 	BlockstoreChunkSize immutable.Option[int]
 	Rootstore           immutable.Option[corekv.ReaderWriter]
 	BlockstoreNamespace string
+
+	// ClearBackoffOnRetry clears the libp2p dial backoff before each
+	// connection attempt, allowing immediate retries after transient failures.
+	ClearBackoffOnRetry bool
 }
 
 // DefaultOptions returns the default net options.
@@ -119,5 +123,14 @@ func WithBlockstoreNamespace(path string) NodeOpt {
 func WithBlockstoreChunkSize(blockstoreChunkSize int) NodeOpt {
 	return func(opts *Options) {
 		opts.BlockstoreChunkSize = immutable.Some(blockstoreChunkSize)
+	}
+}
+
+// WithClearBackoffOnRetry enables clearing the libp2p dial backoff before
+// each connection attempt. This allows immediate retries after transient
+// connection failures instead of waiting for the backoff period to expire.
+func WithClearBackoffOnRetry(enable bool) NodeOpt {
+	return func(opts *Options) {
+		opts.ClearBackoffOnRetry = enable
 	}
 }
