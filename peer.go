@@ -117,7 +117,7 @@ func NewPeer(
 	log.InfoContext(
 		ctx,
 		"Created LibP2P host",
-		corelog.Any("PeerId", h.ID()),
+		corelog.Any("PeerID", h.ID()),
 		corelog.Any("Address", options.ListenAddresses),
 	)
 
