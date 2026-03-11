@@ -16,6 +16,7 @@ package p2p
 
 import (
 	"github.com/ipfs/boxo/blockstore"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/sourcenetwork/corekv"
 	"github.com/sourcenetwork/immutable"
 )
@@ -27,6 +28,8 @@ type Options struct {
 	EnablePubSub    bool
 	EnableRelay     bool
 	BootstrapPeers  []string
+
+	ResourceManager network.ResourceManager
 
 	Blockstore          immutable.Option[blockstore.Blockstore]
 	BlockstoreChunkSize immutable.Option[int]
@@ -78,6 +81,15 @@ func WithListenAddresses(addresses ...string) NodeOpt {
 	}
 }
 
+// WithResourceManager sets resource manager for p2p host
+//
+// If ResourceManager is not provided libp2p will use its default autoscaled resource manager
+func WithResourceManager(rcmgr network.ResourceManager) NodeOpt {
+	return func(opt *Options) {
+		opt.ResourceManager = rcmgr
+	}
+}
+
 // WithBootstrapPeers sets the bootstrap peer addresses to attempt to connect to.
 func WithBootstrapPeers(peers ...string) NodeOpt {
 	return func(opt *Options) {
@@ -85,7 +97,7 @@ func WithBootstrapPeers(peers ...string) NodeOpt {
 	}
 }
 
-// WithBootstrapPeers sets the backing blockstore that the Peer will use to send/receive/store blocks.
+// WithBlockstore sets the backing blockstore that the Peer will use to send/receive/store blocks.
 //
 // Providing either Blockstore or Rootstore is required.
 func WithBlockstore(blockstore blockstore.Blockstore) NodeOpt {
