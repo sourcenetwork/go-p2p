@@ -79,6 +79,11 @@ func setupHost(ctx context.Context, options *Options) (host.Host, *dualdht.DHT, 
 		libp2pOpts = append(libp2pOpts, libp2p.Identity(privateKey))
 	}
 
+	// enable rcmgr option, otherwise fallback to libp2p defaults
+	if options.ResourceManager != nil {
+		libp2pOpts = append(libp2pOpts, libp2p.ResourceManager(options.ResourceManager))
+	}
+
 	h, err := libp2p.New(libp2pOpts...)
 	if err != nil {
 		return nil, nil, err
