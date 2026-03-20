@@ -30,8 +30,8 @@ var (
 	ErrBlockstoreOrRootRequired   = errors.New("either blockstore or rootstore must be provided")
 	ErrNegativeMaxMemory          = errors.New("ResourceLimits.MaxMemory must be >= 0")
 	ErrNegativeMaxFileDescriptors = errors.New("ResourceLimits.MaxFileDescriptors must be >= 0")
-	ErrMaxMemoryTooLow            = errors.New("ResourceLimits.MaxMemory must be 0 (autoscale) or >= 128 MiB")
-	ErrMaxFileDescriptorsTooLow   = errors.New("ResourceLimits.MaxFileDescriptors must be 0 (autoscale) or >= 128")
+	ErrMaxMemoryTooLow            = errors.New("ResourceLimits.MaxMemory must be 0 (autodetect) or >= 128 MiB")
+	ErrMaxFileDescriptorsTooLow   = errors.New("ResourceLimits.MaxFileDescriptors must be 0 (autodetect) or >= 256")
 )
 
 func NewErrPushLog(inner error, topic string) error {
