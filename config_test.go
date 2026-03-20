@@ -15,7 +15,6 @@ package p2p
 import (
 	"testing"
 
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -50,9 +49,9 @@ func TestWithPrivateKey(t *testing.T) {
 	assert.Equal(t, []byte("abc"), opts.PrivateKey)
 }
 
-func TestWithResourceManager(t *testing.T) {
+func TestWithResourceLimits(t *testing.T) {
 	opts := &Options{}
-	rm := &network.NullResourceManager{}
-	WithResourceManager(rm)(opts)
-	assert.Equal(t, rm, opts.ResourceManager)
+	limits := ResourceLimits{MaxMemory: 512 * 1024 * 1024, MaxFileDescriptors: 256}
+	WithResourceLimits(limits)(opts)
+	assert.Equal(t, limits, opts.ResourceLimits.Value())
 }

@@ -21,6 +21,18 @@ import (
 	"github.com/sourcenetwork/immutable"
 )
 
+// ResourceLimits configures the maximum resources available to the P2P host.
+// Connection, stream, and file descriptor limits are derived from these values.
+// A zero value means use a sensible default (half of system resources).
+type ResourceLimits struct {
+	// MaxMemory is the maximum memory in bytes available to the P2P host.
+	// 0 means use half of system RAM.
+	MaxMemory int64
+	// MaxFileDescriptors is the maximum number of file descriptors available to the P2P host.
+	// 0 means skip FD limits and let libp2p autoscale.
+	MaxFileDescriptors int
+}
+
 // Options is the node options.
 type Options struct {
 	ListenAddresses []string
@@ -30,6 +42,7 @@ type Options struct {
 	BootstrapPeers  []string
 
 	ResourceManager network.ResourceManager
+	ResourceLimits  immutable.Option[ResourceLimits]
 
 	Blockstore          immutable.Option[blockstore.Blockstore]
 	BlockstoreChunkSize immutable.Option[int]
@@ -83,10 +96,21 @@ func WithListenAddresses(addresses ...string) NodeOpt {
 
 // WithResourceManager sets resource manager for p2p host
 //
-// If ResourceManager is not provided libp2p will use its default autoscaled resource manager
+// If ResourceManager is not provided, we will attempt to read ResourceLimits
+// and derive a ResourceManager
 func WithResourceManager(rcmgr network.ResourceManager) NodeOpt {
 	return func(opt *Options) {
 		opt.ResourceManager = rcmgr
+	}
+}
+
+// WithResourceLimits sets the memory and file descriptor limits for the P2P host.
+//
+// If WithResourceManager is also set, it takes precedence and this option is ignored.
+// If neither is provided, libp2p will use its default autoscaled resource manager.
+func WithResourceLimits(limits ResourceLimits) NodeOpt {
+	return func(opt *Options) {
+		opt.ResourceLimits = immutable.Some(limits)
 	}
 }
 
