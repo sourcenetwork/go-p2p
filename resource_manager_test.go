@@ -98,6 +98,42 @@ func TestBuildResourceManager_ZeroMemory(t *testing.T) {
 	rm.Close()
 }
 
+// TestBuildResourceControls_NegativeMemory verifies that negative MaxMemory is rejected.
+func TestBuildResourceControls_NegativeMemory(t *testing.T) {
+	opts := &Options{
+		ResourceLimits: immutable.Some(ResourceLimits{MaxMemory: -1}),
+	}
+	_, _, err := buildResourceControls(opts)
+	assert.ErrorIs(t, err, ErrNegativeMaxMemory)
+}
+
+// TestBuildResourceControls_NegativeFDs verifies that negative MaxFileDescriptors is rejected.
+func TestBuildResourceControls_NegativeFDs(t *testing.T) {
+	opts := &Options{
+		ResourceLimits: immutable.Some(ResourceLimits{MaxFileDescriptors: -1}),
+	}
+	_, _, err := buildResourceControls(opts)
+	assert.ErrorIs(t, err, ErrNegativeMaxFileDescriptors)
+}
+
+// TestBuildResourceControls_MemoryTooLow verifies that a non-zero MaxMemory below 128 MiB is rejected.
+func TestBuildResourceControls_MemoryTooLow(t *testing.T) {
+	opts := &Options{
+		ResourceLimits: immutable.Some(ResourceLimits{MaxMemory: 64 << 20}),
+	}
+	_, _, err := buildResourceControls(opts)
+	assert.ErrorIs(t, err, ErrMaxMemoryTooLow)
+}
+
+// TestBuildResourceControls_FDsTooLow verifies that a non-zero MaxFileDescriptors below 128 is rejected.
+func TestBuildResourceControls_FDsTooLow(t *testing.T) {
+	opts := &Options{
+		ResourceLimits: immutable.Some(ResourceLimits{MaxMemory: testMemory128MB, MaxFileDescriptors: 128}),
+	}
+	_, _, err := buildResourceControls(opts)
+	assert.ErrorIs(t, err, ErrMaxFileDescriptorsTooLow)
+}
+
 // TestBuildResourceControls_NeitherSet verifies default connmgr is returned
 // with no resource manager when neither option is set.
 func TestBuildResourceControls_NeitherSet(t *testing.T) {

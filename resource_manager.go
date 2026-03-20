@@ -27,9 +27,32 @@ const (
 	connMgrGracePeriod      = 20 * time.Second
 	defaultConnMgrLowWater  = 100
 	defaultConnMgrHighWater = 400
+
+	minMaxMemory          = 128 << 20 // 128 MiB
+	minMaxFileDescriptors = 256
 )
 
 var infiniteResourceLimits = rcmgr.InfiniteLimits.ToPartialLimitConfig().System
+
+// validate returns an error if any field of ResourceLimits is invalid.
+// Negative values are rejected because libp2p interprets -1 as Unlimited
+// and -2 as BlockAll, silently producing unintended behavior.
+// Values below the minimum thresholds are rejected to prevent misconfiguration.
+func (rl ResourceLimits) validate() error {
+	if rl.MaxMemory < 0 {
+		return ErrNegativeMaxMemory
+	}
+	if rl.MaxMemory > 0 && rl.MaxMemory < minMaxMemory {
+		return ErrMaxMemoryTooLow
+	}
+	if rl.MaxFileDescriptors < 0 {
+		return ErrNegativeMaxFileDescriptors
+	}
+	if rl.MaxFileDescriptors > 0 && rl.MaxFileDescriptors < minMaxFileDescriptors {
+		return ErrMaxFileDescriptorsTooLow
+	}
+	return nil
+}
 
 // connsFromMemory derives the maximum inbound connection count from a memory budget.
 // Uses 1 connection per MB, matching Kubo's derivation.
@@ -55,21 +78,39 @@ func buildResourceManager(limits ResourceLimits) (network.ResourceManager, error
 
 	partialLimits := rcmgr.PartialLimitConfig{
 		System: rcmgr.ResourceLimits{
-			Memory:       rcmgr.LimitVal64(maxMem),
-			Conns:        rcmgr.Unlimited,
-			ConnsInbound: rcmgr.LimitVal(conns),
+			Memory: rcmgr.LimitVal64(maxMem),
+
+			Conns:         rcmgr.Unlimited,
+			ConnsInbound:  rcmgr.LimitVal(conns),
+			ConnsOutbound: rcmgr.Unlimited,
+
+			Streams:         rcmgr.Unlimited,
+			StreamsOutbound: rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.Unlimited,
 		},
 		// Transient connections are limited to 25% of system resources.
 		Transient: rcmgr.ResourceLimits{
-			Memory:       rcmgr.LimitVal64(maxMem / 4),
-			Conns:        rcmgr.Unlimited,
-			ConnsInbound: rcmgr.LimitVal(conns / 4),
+			Memory: rcmgr.LimitVal64(maxMem / 4),
+
+			Conns:         rcmgr.Unlimited,
+			ConnsInbound:  rcmgr.LimitVal(conns / 4),
+			ConnsOutbound: rcmgr.Unlimited,
+
+			Streams:         rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.Unlimited,
+			StreamsOutbound: rcmgr.Unlimited,
 		},
 		// Constrain inbound only — guards against unintentional overuse by a single peer.
 		// Not a DoS defense: an attacker can spin up multiple peer IDs.
 		PeerDefault: rcmgr.ResourceLimits{
-			ConnsInbound:   rcmgr.DefaultLimit,
-			StreamsInbound: rcmgr.DefaultLimit,
+			Memory:          rcmgr.Unlimited64,
+			FD:              rcmgr.Unlimited,
+			Conns:           rcmgr.Unlimited,
+			ConnsInbound:    rcmgr.DefaultLimit,
+			ConnsOutbound:   rcmgr.Unlimited,
+			Streams:         rcmgr.Unlimited,
+			StreamsInbound:  rcmgr.DefaultLimit,
+			StreamsOutbound: rcmgr.Unlimited,
 		},
 		// Keep service and protocol scopes unlimited for simplicity.
 		ServiceDefault:      infiniteResourceLimits,
@@ -80,7 +121,7 @@ func buildResourceManager(limits ResourceLimits) (network.ResourceManager, error
 		Stream:              infiniteResourceLimits,
 	}
 
-	// Only apply FD limits if it's set, zero value will cause a block all limit
+	// Only apply FD limits when explicitly set
 	if fds > 0 {
 		partialLimits.System.FD = rcmgr.LimitVal(fds)
 		partialLimits.Transient.FD = rcmgr.LimitVal(fds / 4)
@@ -88,7 +129,14 @@ func buildResourceManager(limits ResourceLimits) (network.ResourceManager, error
 
 	scalingLimitConfig := rcmgr.DefaultLimits
 	libp2p.SetDefaultServiceLimits(&scalingLimitConfig)
-	limitConfig := partialLimits.Build(scalingLimitConfig.Scale(maxMem, fds))
+	var base rcmgr.ConcreteLimitConfig
+	if fds > 0 {
+		base = scalingLimitConfig.Scale(maxMem, fds)
+	} else {
+		// fds == 0: let libp2p detect system FDs via AutoScale.
+		base = scalingLimitConfig.AutoScale()
+	}
+	limitConfig := partialLimits.Build(base)
 
 	return rcmgr.NewResourceManager(rcmgr.NewFixedLimiter(limitConfig))
 }
@@ -119,6 +167,9 @@ func buildResourceControls(options *Options) (iconnmgr.ConnManager, network.Reso
 
 	if options.ResourceLimits.HasValue() {
 		limits := options.ResourceLimits.Value()
+		if err := limits.validate(); err != nil {
+			return nil, nil, err
+		}
 		cm, err := buildConnManager(limits)
 		if err != nil {
 			return nil, nil, err

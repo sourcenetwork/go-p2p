@@ -26,8 +26,12 @@ var (
 	ErrTimeoutWaitingForPeerInfo = errors.New("timeout waiting for peer info")
 	ErrContextDone               = errors.New("context done")
 	// ErrHashMismatch is an error returned when the hash of a block is different than expected.
-	ErrHashMismatch             = errors.New("block in storage has different hash than requested")
-	ErrBlockstoreOrRootRequired = errors.New("either blockstore or rootstore must be provided")
+	ErrHashMismatch               = errors.New("block in storage has different hash than requested")
+	ErrBlockstoreOrRootRequired   = errors.New("either blockstore or rootstore must be provided")
+	ErrNegativeMaxMemory          = errors.New("ResourceLimits.MaxMemory must be >= 0")
+	ErrNegativeMaxFileDescriptors = errors.New("ResourceLimits.MaxFileDescriptors must be >= 0")
+	ErrMaxMemoryTooLow            = errors.New("ResourceLimits.MaxMemory must be 0 (autoscale) or >= 128 MiB")
+	ErrMaxFileDescriptorsTooLow   = errors.New("ResourceLimits.MaxFileDescriptors must be 0 (autoscale) or >= 128")
 )
 
 func NewErrPushLog(inner error, topic string) error {

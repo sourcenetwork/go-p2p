@@ -29,7 +29,7 @@ type ResourceLimits struct {
 	// 0 means use half of system RAM.
 	MaxMemory int64
 	// MaxFileDescriptors is the maximum number of file descriptors available to the P2P host.
-	// 0 means skip FD limits and let libp2p autoscale.
+	// 0 means libp2p auto-detects and sets the system file descriptor limit.
 	MaxFileDescriptors int
 }
 
