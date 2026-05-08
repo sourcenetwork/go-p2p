@@ -17,8 +17,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ipfs/boxo/blockservice"
-	"github.com/ipld/go-ipld-prime/storage/bsrvadapter"
 	libp2p "github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dualdht "github.com/libp2p/go-libp2p-kad-dht/dual"
@@ -327,12 +325,17 @@ func (p *Peer) publishToTopic(
 
 // IPLDStore returns the a wrapped blockservice.BlockService that implements the blockstore.IPLDStore interface.
 func (p *Peer) IPLDStore() blockstore.IPLDStore {
-	return &bsrvadapter.Adapter{Wrapped: p.blockService}
+	return &remoteIPLDStore{peer: p}
 }
 
 // ContextWithSession returns a context with a session for the blockservice.
-func (p *Peer) ContextWithSession(ctx context.Context) context.Context {
-	return blockservice.ContextWithSession(ctx, p.blockService)
+//
+// Pass the IDs of peers known to hold the blocks you are about to fetch (e.g.
+// the sender of the pubsub announcement that triggered the sync). With no IDs,
+// the resulting context falls back to all currently-connected peers, matching
+// bitswap's broadcast-style discovery.
+func (p *Peer) ContextWithSession(ctx context.Context, peerIDs ...string) context.Context {
+	return context.WithValue(ctx, sessionKey{}, peerIDs)
 }
 
 func (p *Peer) SetBlockAccessFunc(accessFunc BlockAccessFunc) {

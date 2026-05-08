@@ -18,9 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ipfs/boxo/bitswap"
-	"github.com/ipfs/boxo/bitswap/network/bsnet"
-	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipfs/boxo/blockstore"
 	"github.com/ipfs/boxo/bootstrap"
 	"github.com/ipfs/go-cid"
@@ -51,8 +48,8 @@ type Peer struct {
 	topics  map[string]pubsubTopic
 	topicMu sync.Mutex
 
-	// peer DAG service
-	blockService blockservice.BlockService
+	// blockstore is the local store used to serve and persist blocks.
+	blockstore blockstore.Blockstore
 
 	bootCloser io.Closer
 
@@ -127,6 +124,7 @@ func NewPeer(
 		ctx:                 ctx,
 		cancel:              cancel,
 		topics:              make(map[string]pubsubTopic),
+		blockstore:          options.Blockstore.Value(),
 		clearBackoffOnRetry: options.ClearBackoffOnRetry,
 	}
 
@@ -142,9 +140,7 @@ func NewPeer(
 		}
 	}
 
-	bswapnet := bsnet.NewFromIpfsHost(h)
-	bswap := bitswap.New(ctx, bswapnet, ddht, options.Blockstore.Value(), bitswap.WithPeerBlockRequestFilter(p.hasAccess))
-	p.blockService = blockservice.New(options.Blockstore.Value(), bswap)
+	h.SetStreamHandler(blockFetchProtocol, p.handleBlockFetch)
 
 	p.bootCloser, err = bootstrap.Bootstrap(h.ID(), h, ddht, bootstrap.BootstrapConfigWithPeers(peers))
 	if err != nil {
@@ -186,10 +182,6 @@ func (p *Peer) Close() {
 
 	if err := p.removeAllPubsubTopics(); err != nil {
 		log.ErrorE("Error closing pubsub topics", err)
-	}
-
-	if err := p.blockService.Close(); err != nil {
-		log.ErrorE("Error closing block service", err)
 	}
 
 	if err := p.host.Close(); err != nil {

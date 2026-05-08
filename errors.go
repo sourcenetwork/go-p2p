@@ -28,6 +28,8 @@ var (
 	// ErrHashMismatch is an error returned when the hash of a block is different than expected.
 	ErrHashMismatch             = errors.New("block in storage has different hash than requested")
 	ErrBlockstoreOrRootRequired = errors.New("either blockstore or rootstore must be provided")
+	// ErrBlockNotFound is returned when no peer in the active session could supply the requested block.
+	ErrBlockNotFound = errors.New("block not found")
 )
 
 func NewErrPushLog(inner error, topic string) error {
