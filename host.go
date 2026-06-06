@@ -188,7 +188,7 @@ func (p *Peer) Disconnect(ctx context.Context, peerID string) error {
 		return err
 	}
 	p.host.Peerstore().ClearAddrs(pid)
-	return nil
+	return p.host.Network().ClosePeer(pid)
 }
 
 func (p *Peer) Send(ctx context.Context, data []byte, peerID string, protocolID string) error {
