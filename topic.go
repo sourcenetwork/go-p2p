@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sourcenetwork/corelog"
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
 )
 
@@ -44,10 +43,6 @@ func (p *Peer) addPubSubTopic(
 	if handler == nil {
 		return pubsubTopic{}, fmt.Errorf("handler cannot be nil")
 	}
-
-	log.InfoContext(p.ctx, "Adding pubsub topic",
-		corelog.String("PeerID", p.host.ID().String()),
-		corelog.String("Topic", topic))
 
 	p.topicMu.Lock()
 	defer p.topicMu.Unlock()
@@ -86,10 +81,6 @@ func (p *Peer) removePubSubTopic(topic string) error {
 		return nil
 	}
 
-	log.Info("Removing pubsub topic",
-		corelog.String("PeerID", p.host.ID().String()),
-		corelog.String("Topic", topic))
-
 	p.topicMu.Lock()
 	defer p.topicMu.Unlock()
 	if t, ok := p.topics[topic]; ok {
@@ -103,9 +94,6 @@ func (p *Peer) removeAllPubsubTopics() error {
 	if p.ps == nil {
 		return nil
 	}
-
-	log.Info("Removing all pubsub topics",
-		corelog.String("PeerID", p.host.ID().String()))
 
 	p.topicMu.Lock()
 	defer p.topicMu.Unlock()
