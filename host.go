@@ -15,7 +15,6 @@ package p2p
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/ipfs/boxo/blockservice"
 	"github.com/ipld/go-ipld-prime/storage/bsrvadapter"
@@ -30,7 +29,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	"github.com/libp2p/go-libp2p/core/routing"
-	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"github.com/libp2p/go-libp2p/p2p/net/swarm"
 	ma "github.com/multiformats/go-multiaddr"
 
@@ -41,11 +39,6 @@ import (
 
 // setupHost returns a host and router configured with the given options.
 func setupHost(ctx context.Context, options *Options) (host.Host, *dualdht.DHT, error) {
-	connManager, err := connmgr.NewConnManager(100, 400, connmgr.WithGracePeriod(time.Second*20))
-	if err != nil {
-		return nil, nil, err
-	}
-
 	dhtOpts := []dualdht.Option{
 		dualdht.DHTOption(dht.NamespacedValidator("pk", record.PublicKeyValidator{})),
 		dualdht.DHTOption(dht.Concurrency(10)),
@@ -54,12 +47,12 @@ func setupHost(ctx context.Context, options *Options) (host.Host, *dualdht.DHT, 
 
 	var ddht *dualdht.DHT
 	routing := func(h host.Host) (routing.PeerRouting, error) {
+		var err error
 		ddht, err = dualdht.New(ctx, h, dhtOpts...)
 		return ddht, err
 	}
 
 	libp2pOpts := []libp2p.Option{
-		libp2p.ConnectionManager(connManager),
 		libp2p.DefaultTransports,
 		libp2p.ListenAddrStrings(options.ListenAddresses...),
 		libp2p.Routing(routing),
@@ -79,9 +72,13 @@ func setupHost(ctx context.Context, options *Options) (host.Host, *dualdht.DHT, 
 		libp2pOpts = append(libp2pOpts, libp2p.Identity(privateKey))
 	}
 
-	// enable rcmgr option, otherwise fallback to libp2p defaults
-	if options.ResourceManager != nil {
-		libp2pOpts = append(libp2pOpts, libp2p.ResourceManager(options.ResourceManager))
+	connManager, rm, err := buildResourceControls(options)
+	if err != nil {
+		return nil, nil, err
+	}
+	libp2pOpts = append(libp2pOpts, libp2p.ConnectionManager(connManager))
+	if rm != nil {
+		libp2pOpts = append(libp2pOpts, libp2p.ResourceManager(rm))
 	}
 
 	h, err := libp2p.New(libp2pOpts...)
