@@ -125,13 +125,39 @@ func (p *Peer) removeAllPubsubTopics() error {
 	return nil
 }
 
+// topicLock is the queue for one topic. It is discarded once the last user
+// hands it back, so a node publishing to many topics does not keep them all.
+type topicLock struct {
+	mu sync.Mutex
+	// Holder plus whoever is waiting, guarded by topicLocksMu.
+	refs int
+}
+
 // lockTopicForDirectPublish waits until nobody else holds the topic, and
 // returns the function that hands it back.
 func (p *Peer) lockTopicForDirectPublish(topic string) func() {
-	v, _ := p.directPublishMu.LoadOrStore(topic, &sync.Mutex{})
-	mu := v.(*sync.Mutex)
-	mu.Lock()
-	return mu.Unlock
+	p.topicLocksMu.Lock()
+	l, ok := p.topicLocks[topic]
+	if !ok {
+		l = &topicLock{}
+		p.topicLocks[topic] = l
+	}
+	// Counted before unlocking the map so the entry survives until we are done
+	// with it, or a waiter could end up queueing on a lock nobody else holds.
+	l.refs++
+	p.topicLocksMu.Unlock()
+
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+
+		p.topicLocksMu.Lock()
+		l.refs--
+		if l.refs == 0 {
+			delete(p.topicLocks, topic)
+		}
+		p.topicLocksMu.Unlock()
+	}
 }
 
 // publishDirectToTopic temporarily joins a pubsub topic to publish data and immediately closes it.

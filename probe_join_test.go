@@ -66,7 +66,7 @@ func TestProbe_ConcurrentDirectPublishCollides(t *testing.T) {
 			t.Logf("first failure: %v", e)
 		}
 	}
-	t.Logf("publish failures after the single retry: %d / %d", count, workers*rounds)
+	require.Zero(t, count, "direct publish failures: %d / %d", count, workers*rounds)
 }
 
 // Probe: a subscription and a direct publish joining the same topic concurrently.
@@ -106,7 +106,8 @@ func TestProbe_SubscribeRacesDirectPublish(t *testing.T) {
 		}()
 		wg.Wait()
 	}
-	t.Logf("publish errors: %d/%d, subscribe errors: %d/%d", pubErrs, rounds, subErrs, rounds)
+	require.Zero(t, pubErrs, "publish errors: %d/%d", pubErrs, rounds)
+	require.Zero(t, subErrs, "subscribe errors: %d/%d", subErrs, rounds)
 }
 
 // Probe: hammer subscribe, unsubscribe and publish on the same topics to shake
@@ -148,4 +149,22 @@ func TestProbe_NoDeadlockUnderMixedLoad(t *testing.T) {
 	case <-time.After(30 * time.Second):
 		t.Fatal("deadlock: mixed subscribe/unsubscribe/publish load did not finish")
 	}
+}
+
+// Probe: the per-topic locks are dropped once nobody is using them.
+func TestProbe_TopicLocksDoNotAccumulate(t *testing.T) {
+	ctx := context.Background()
+	n, err := NewPeer(ctx, WithRootstore(memory.NewDatastore(ctx)), WithEnablePubSub(true))
+	require.NoError(t, err)
+	defer n.Close()
+
+	for r := range 50 {
+		_, err := n.publishDirectToTopic(ctx, fmt.Sprintf("throwaway-%d", r), []byte("x"))
+		require.NoError(t, err)
+	}
+
+	n.topicLocksMu.Lock()
+	remaining := len(n.topicLocks)
+	n.topicLocksMu.Unlock()
+	require.Zero(t, remaining, "per-topic locks left behind after publishing")
 }
