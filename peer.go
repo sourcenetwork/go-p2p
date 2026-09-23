@@ -51,6 +51,12 @@ type Peer struct {
 	topics  map[string]pubsubTopic
 	topicMu sync.Mutex
 
+	// A topic allows only one open handle, so two goroutines joining the same
+	// one at once means a lost publish. They queue on a lock per topic, which
+	// is dropped once nobody wants it, as the topics are unbounded.
+	topicLocks   map[string]*topicLock
+	topicLocksMu sync.Mutex
+
 	// peer DAG service
 	blockService blockservice.BlockService
 
@@ -127,6 +133,7 @@ func NewPeer(
 		ctx:                 ctx,
 		cancel:              cancel,
 		topics:              make(map[string]pubsubTopic),
+		topicLocks:          make(map[string]*topicLock),
 		clearBackoffOnRetry: options.ClearBackoffOnRetry,
 	}
 

@@ -14,8 +14,9 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strings"
+	"sync"
 
 	"github.com/sourcenetwork/corelog"
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
@@ -48,6 +49,12 @@ func (p *Peer) addPubSubTopic(
 	log.InfoContext(p.ctx, "Adding pubsub topic",
 		corelog.String("PeerID", p.host.ID().String()),
 		corelog.String("Topic", topic))
+
+	// Subscribing joins the topic, and so does a publish to a topic nobody
+	// subscribes to. Whichever gets there second fails, so wait for the other
+	// to be done. Locked before topicMu, the order publishing uses.
+	unlock := p.lockTopicForDirectPublish(topic)
+	defer unlock()
 
 	p.topicMu.Lock()
 	defer p.topicMu.Unlock()
@@ -118,22 +125,70 @@ func (p *Peer) removeAllPubsubTopics() error {
 	return nil
 }
 
+// topicLock is the queue for one topic. It is discarded once the last user
+// hands it back, so a node publishing to many topics does not keep them all.
+type topicLock struct {
+	mu sync.Mutex
+	// Holder plus whoever is waiting, guarded by topicLocksMu.
+	refs int
+}
+
+// lockTopicForDirectPublish waits until nobody else holds the topic, and
+// returns the function that hands it back.
+func (p *Peer) lockTopicForDirectPublish(topic string) func() {
+	p.topicLocksMu.Lock()
+	l, ok := p.topicLocks[topic]
+	if !ok {
+		l = &topicLock{}
+		p.topicLocks[topic] = l
+	}
+	// Counted before unlocking the map so the entry survives until we are done
+	// with it, or a waiter could end up queueing on a lock nobody else holds.
+	l.refs++
+	p.topicLocksMu.Unlock()
+
+	l.mu.Lock()
+	return func() {
+		l.mu.Unlock()
+
+		p.topicLocksMu.Lock()
+		l.refs--
+		if l.refs == 0 {
+			delete(p.topicLocks, topic)
+		}
+		p.topicLocksMu.Unlock()
+	}
+}
+
 // publishDirectToTopic temporarily joins a pubsub topic to publish data and immediately closes it.
 //
 // This is useful to publish messages without incurring the cost of a full pubsub rpc topic.
-func (p *Peer) publishDirectToTopic(ctx context.Context, topic string, data []byte, isRetry bool) error {
+//
+// Returns false if the topic gained a subscriber in the meantime. Its handle
+// stays open for good, so joining is no longer possible and the caller has to
+// publish through it instead.
+func (p *Peer) publishDirectToTopic(ctx context.Context, topic string, data []byte) (bool, error) {
+	// The join below fails while anyone else holds this topic, so wait.
+	unlock := p.lockTopicForDirectPublish(topic)
+	defer unlock()
+
+	// A subscriber may have taken the topic while we waited.
+	p.topicMu.Lock()
+	_, subscribed := p.topics[topic]
+	p.topicMu.Unlock()
+	if subscribed {
+		return false, nil
+	}
+
 	psTopic, err := p.ps.Join(topic)
 	if err != nil {
-		if strings.Contains(err.Error(), "topic already exists") && !isRetry {
-			// Reaching this is really rare and probably only possible
-			// through from tests. We can handle this by simply trying again a single time.
-			return p.publishDirectToTopic(ctx, topic, data, true)
-		}
-		return NewErrPushLog(err, topic)
+		return false, NewErrPushLog(err, topic)
 	}
 	err = psTopic.Publish(ctx, data)
 	if err != nil {
-		return NewErrPushLog(err, topic)
+		// Leaving it open would block every later publish to this topic.
+		closeErr := psTopic.Close()
+		return false, NewErrPushLog(errors.Join(err, closeErr), topic)
 	}
-	return psTopic.Close()
+	return true, psTopic.Close()
 }
