@@ -51,6 +51,10 @@ type Peer struct {
 	topics  map[string]pubsubTopic
 	topicMu sync.Mutex
 
+	// A topic allows only one open handle, so two goroutines joining the same
+	// one at once means a lost publish. They queue on a *sync.Mutex per topic.
+	directPublishMu sync.Map
+
 	// peer DAG service
 	blockService blockservice.BlockService
 

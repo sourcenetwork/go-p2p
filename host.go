@@ -285,10 +285,23 @@ func (p *Peer) publishToTopic(
 		return nil, nil
 	}
 
-	p.topicMu.Lock()
-	t, ok := p.topics[topic]
-	p.topicMu.Unlock()
-	if ok {
+	for {
+		p.topicMu.Lock()
+		t, ok := p.topics[topic]
+		p.topicMu.Unlock()
+		if !ok {
+			// Not subscribed, so join the topic just to publish. If a
+			// subscription took the topic first, retry and use it instead.
+			published, err := p.publishDirectToTopic(ctx, topic, data)
+			if err != nil {
+				return nil, err
+			}
+			if published {
+				return nil, nil
+			}
+			continue
+		}
+
 		resp, err := t.Publish(ctx, data, options...)
 		if err != nil {
 			return nil, NewErrPushLog(err, topic)
@@ -319,10 +332,6 @@ func (p *Peer) publishToTopic(
 		}
 		return nil, nil
 	}
-
-	// If the topic hasn't been explicitly subscribed to, we temporarily join it
-	// to publish the log.
-	return nil, p.publishDirectToTopic(ctx, topic, data, false)
 }
 
 // IPLDStore returns the a wrapped blockservice.BlockService that implements the blockstore.IPLDStore interface.
