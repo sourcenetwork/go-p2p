@@ -16,7 +16,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+	"slices"
 	"sync"
+	"time"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/sourcenetwork/corelog"
 	rpc "github.com/sourcenetwork/go-libp2p-pubsub-rpc"
@@ -191,4 +196,38 @@ func (p *Peer) publishDirectToTopic(ctx context.Context, topic string, data []by
 		return false, NewErrPushLog(errors.Join(err, closeErr), topic)
 	}
 	return true, psTopic.Close()
+}
+
+// TopicPeers returns the peers on the topic that this node can send to right
+// now. Waiting for a peer to show up here before sending to it keeps a message
+// sent right after connecting from being lost.
+func (p *Peer) TopicPeers(topic string) []string {
+	if p.ps == nil {
+		return nil
+	}
+	peers := p.ps.ListPeers(topic)
+	ids := make([]string, 0, len(peers))
+	for _, id := range peers {
+		ids = append(ids, id.String())
+	}
+	return ids
+}
+
+// replyRouteTimeout is longer than an asker waits for a reply by default, so a
+// reply that has to wait longer would not be read anyway.
+const replyRouteTimeout = 5 * time.Second
+
+// waitForReplyRoute waits until this node can send a reply to the asker.
+// Without it, a reply sent right after two nodes connect can be lost, and the
+// asker times out.
+func (p *Peer) waitForReplyRoute(topic string, asker peer.ID) {
+	// Matches the name pubsub-rpc gives the reply topic.
+	replyTopic := path.Join(topic, asker.String(), "_response")
+	deadline := time.Now().Add(replyRouteTimeout)
+	for time.Now().Before(deadline) {
+		if slices.Contains(p.ps.ListPeers(replyTopic), asker) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 }

@@ -234,7 +234,13 @@ func (p *Peer) AddPubSubTopic(
 	eventHandler PeerEventHandler,
 ) error {
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
-		return handler(from.String(), topic, msg)
+		res, err := handler(from.String(), topic, msg)
+		// A reply sent before this node can reach the asker is lost, so wait
+		// until it can.
+		if res != nil {
+			p.waitForReplyRoute(topic, from)
+		}
+		return res, err
 	}
 	var eventHandlerWrapper func(from peer.ID, topic string, msg []byte)
 	if eventHandler != nil {
@@ -269,10 +275,12 @@ func (p *Peer) PublishToTopic(
 	data []byte,
 	withMultiResponse bool,
 ) (<-chan PubsubResponse, error) {
+	// A request sent before a peer joins the topic is lost, so resend it when
+	// one joins.
 	if withMultiResponse {
-		return p.publishToTopic(ctx, topic, data, rpc.WithMultiResponse(true))
+		return p.publishToTopic(ctx, topic, data, rpc.WithMultiResponse(true), rpc.WithRepublishing(true))
 	}
-	return p.publishToTopic(ctx, topic, data)
+	return p.publishToTopic(ctx, topic, data, rpc.WithRepublishing(true))
 }
 
 func (p *Peer) publishToTopic(
