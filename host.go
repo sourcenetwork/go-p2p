@@ -261,14 +261,17 @@ func (p *Peer) RemovePubSubTopic(topic string) error {
 //
 // This is a non blocking operation.
 func (p *Peer) PublishToTopicAsync(ctx context.Context, topic string, data []byte) error {
+	// We don't use rpc.WithRepublishing here because nobody is waiting for the reply here
 	_, err := p.publishToTopic(ctx, topic, data, rpc.WithIgnoreResponse(true))
 	return err
 }
 
 // PublishToTopic publishes the given data on the PubSub network via the
-// corresponding topic.
+// corresponding topic, and returns a channel that receives the replies.
 //
-// It will block until a response is received
+// The request is kept, and resent to peers that join the topic, until ctx
+// ends. Pass a ctx that ends once you stop reading replies, or it is held
+// for as long as ctx lives.
 func (p *Peer) PublishToTopic(
 	ctx context.Context,
 	topic string,
@@ -327,11 +330,18 @@ func (p *Peer) publishToTopic(
 							close(respChan)
 							return
 						}
-						respChan <- PubsubResponse{
+						// The caller may have stopped reading, so a reply must
+						// not block this past the end of ctx.
+						select {
+						case respChan <- PubsubResponse{
 							ID:   r.ID,
 							From: r.From.String(),
 							Data: r.Data,
 							Err:  r.Err,
+						}:
+						case <-ctx.Done():
+							close(respChan)
+							return
 						}
 					}
 				}
