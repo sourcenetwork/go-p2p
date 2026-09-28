@@ -14,6 +14,8 @@ package p2p
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -99,4 +101,54 @@ func TestTopicPeers_ListsSubscribedPeer(t *testing.T) {
 		peers := a.TopicPeers(topic)
 		return len(peers) == 1 && peers[0] == b.ID()
 	}, 5*time.Second, 10*time.Millisecond)
+}
+
+// A request whose ctx has ended must not be resent to peers that join later.
+func TestPublishToTopic_CancelledRequest_IsNotResent(t *testing.T) {
+	ctx := context.Background()
+	newPeer := func() *Peer {
+		p, err := NewPeer(
+			ctx,
+			WithRootstore(memory.NewDatastore(ctx)),
+			WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
+			WithEnablePubSub(true),
+		)
+		require.NoError(t, err)
+		return p
+	}
+	requester := newPeer()
+	defer requester.Close()
+	responder := newPeer()
+	defer responder.Close()
+
+	addrs, err := responder.Addresses()
+	require.NoError(t, err)
+	require.NoError(t, requester.Connect(ctx, addrs))
+
+	noop := func(from, topic string, msg []byte) ([]byte, error) { return nil, nil }
+	var received atomic.Int32
+	count := func(from, topic string, msg []byte) ([]byte, error) {
+		received.Add(1)
+		return nil, nil
+	}
+
+	// Getting stuck depends on which of two ready channels is picked first, so
+	// try enough times that a single stuck request is all but certain.
+	const attempts = 30
+	for i := range attempts {
+		topic := fmt.Sprintf("cancelled-%d", i)
+		require.NoError(t, requester.AddPubSubTopic(topic, true, noop, nil))
+
+		reqCtx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+		replies, err := requester.PublishToTopic(reqCtx, topic, []byte("request"), false)
+		require.NoError(t, err)
+		for range replies {
+		}
+		cancel()
+
+		require.NoError(t, responder.AddPubSubTopic(topic, true, count, nil))
+	}
+
+	time.Sleep(time.Second)
+	require.Zero(t, received.Load(), "a cancelled request was resent to a peer that joined later")
 }

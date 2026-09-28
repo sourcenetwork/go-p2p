@@ -275,6 +275,8 @@ func (p *Peer) PublishToTopicAsync(ctx context.Context, topic string, data []byt
 
 // PublishToTopic publishes the given data on the PubSub network via the
 // corresponding topic, and returns a channel that receives the replies.
+// Replies need the topic added with AddPubSubTopic first. Without that, the
+// data is sent once and the returned channel is nil.
 //
 // The request is kept, and resent to peers that join the topic, until ctx
 // ends. Pass a ctx that ends once you stop reading replies, or it is held
@@ -327,14 +329,19 @@ func (p *Peer) publishToTopic(
 		if resp != nil {
 			respChan := make(chan PubsubResponse)
 			go func() {
+				// Read resp until it closes. Otherwise pubsub-rpc gets stuck and
+				// keeps resending the request forever.
+				defer func() {
+					for range resp {
+					}
+				}()
+				defer close(respChan)
 				for {
 					select {
 					case <-ctx.Done():
-						close(respChan)
 						return
 					case r, ok := <-resp:
 						if !ok {
-							close(respChan)
 							return
 						}
 						// The caller may have stopped reading, so a reply must
@@ -347,7 +354,6 @@ func (p *Peer) publishToTopic(
 							Err:  r.Err,
 						}:
 						case <-ctx.Done():
-							close(respChan)
 							return
 						}
 					}
