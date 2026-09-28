@@ -152,3 +152,26 @@ func TestPublishToTopic_CancelledRequest_IsNotResent(t *testing.T) {
 	time.Sleep(time.Second)
 	require.Zero(t, received.Load(), "a cancelled request was resent to a peer that joined later")
 }
+
+func TestWithRequestTimeout_NoDeadline_GetsDefault(t *testing.T) {
+	ctx, cancel := withRequestTimeout(context.Background())
+	defer cancel()
+
+	deadline, ok := ctx.Deadline()
+	require.True(t, ok)
+	require.WithinDuration(t, time.Now().Add(defaultRequestTimeout), deadline, time.Second)
+}
+
+func TestWithRequestTimeout_WithDeadline_KeepsIt(t *testing.T) {
+	want := time.Now().Add(time.Minute)
+	parent, cancelParent := context.WithDeadline(context.Background(), want)
+	defer cancelParent()
+
+	ctx, cancel := withRequestTimeout(parent)
+	deadline, ok := ctx.Deadline()
+	require.True(t, ok)
+	require.Equal(t, want, deadline)
+
+	cancel()
+	require.Error(t, ctx.Err(), "cancel must still end the request")
+}

@@ -269,7 +269,7 @@ func (p *Peer) TopicPeers(topic string) []string {
 // This is a non blocking operation.
 func (p *Peer) PublishToTopicAsync(ctx context.Context, topic string, data []byte) error {
 	// We don't use rpc.WithRepublishing here because nobody is waiting for the reply here
-	_, err := p.publishToTopic(ctx, topic, data, rpc.WithIgnoreResponse(true))
+	_, err := p.publishToTopic(ctx, topic, data, func() {}, rpc.WithIgnoreResponse(true))
 	return err
 }
 
@@ -279,26 +279,47 @@ func (p *Peer) PublishToTopicAsync(ctx context.Context, topic string, data []byt
 // data is sent once and the returned channel is nil.
 //
 // The request is kept, and resent to peers that join the topic, until ctx
-// ends. Pass a ctx that ends once you stop reading replies, or it is held
-// for as long as ctx lives.
+// ends. A ctx without a deadline ends after defaultRequestTimeout.
 func (p *Peer) PublishToTopic(
 	ctx context.Context,
 	topic string,
 	data []byte,
 	withMultiResponse bool,
 ) (<-chan PubsubResponse, error) {
+	ctx, cancel := withRequestTimeout(ctx)
 	// A request sent before a peer joins the topic is lost, so resend it when
 	// one joins.
+	opts := []rpc.PublishOption{rpc.WithRepublishing(true)}
 	if withMultiResponse {
-		return p.publishToTopic(ctx, topic, data, rpc.WithMultiResponse(true), rpc.WithRepublishing(true))
+		opts = append(opts, rpc.WithMultiResponse(true))
 	}
-	return p.publishToTopic(ctx, topic, data, rpc.WithRepublishing(true))
+	resp, err := p.publishToTopic(ctx, topic, data, cancel, opts...)
+	if resp == nil {
+		// Nothing is forwarding replies, so nothing else will end ctx.
+		cancel()
+	}
+	return resp, err
 }
 
+// defaultRequestTimeout ends a request whose ctx has no deadline. Without it,
+// a caller that never ends ctx keeps the request, and its resends, forever.
+const defaultRequestTimeout = 30 * time.Second
+
+// withRequestTimeout gives ctx a deadline of defaultRequestTimeout if it has
+// none.
+func withRequestTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, defaultRequestTimeout)
+}
+
+// publishToTopic calls done once it stops forwarding replies.
 func (p *Peer) publishToTopic(
 	ctx context.Context,
 	topic string,
 	data []byte,
+	done func(),
 	options ...rpc.PublishOption,
 ) (<-chan PubsubResponse, error) {
 	if p.ps == nil { // skip if we aren't running with a pubsub net
@@ -329,6 +350,7 @@ func (p *Peer) publishToTopic(
 		if resp != nil {
 			respChan := make(chan PubsubResponse)
 			go func() {
+				defer done()
 				// Read resp until it closes. Otherwise pubsub-rpc gets stuck and
 				// keeps resending the request forever.
 				defer func() {
