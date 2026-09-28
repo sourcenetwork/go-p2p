@@ -220,11 +220,20 @@ const replyRouteTimeout = 5 * time.Second
 func (p *Peer) waitForReplyRoute(topic string, asker peer.ID) {
 	// Matches the name pubsub-rpc gives the reply topic.
 	replyTopic := path.Join(topic, asker.String(), "_response")
-	deadline := time.Now().Add(replyRouteTimeout)
-	for time.Now().Before(deadline) {
+	timeout := time.NewTimer(replyRouteTimeout)
+	defer timeout.Stop()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
 		if slices.Contains(p.ps.ListPeers(replyTopic), asker) {
 			return
 		}
-		time.Sleep(10 * time.Millisecond)
+		select {
+		case <-ticker.C:
+		case <-timeout.C:
+			return
+		case <-p.ctx.Done():
+			return
+		}
 	}
 }
