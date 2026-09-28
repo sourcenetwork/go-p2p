@@ -198,10 +198,7 @@ func (p *Peer) publishDirectToTopic(ctx context.Context, topic string, data []by
 	return true, psTopic.Close()
 }
 
-// TopicPeers returns the peers on the topic that this node can send to right
-// now. Waiting for a peer to show up here before sending to it keeps a message
-// sent right after connecting from being lost.
-func (p *Peer) TopicPeers(topic string) []string {
+func (p *Peer) topicPeers(topic string) []string {
 	if p.ps == nil {
 		return nil
 	}

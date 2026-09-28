@@ -256,6 +256,13 @@ func (p *Peer) RemovePubSubTopic(topic string) error {
 	return p.removePubSubTopic(topic)
 }
 
+// TopicPeers returns the peers on the topic that this node can send to right
+// now. Waiting for a peer to show up here before sending to it keeps a message
+// sent right after connecting from being lost.
+func (p *Peer) TopicPeers(topic string) []string {
+	return p.topicPeers(topic)
+}
+
 // PublishToTopicAsync publishes the given data on the PubSub network via the
 // corresponding topic asynchronously.
 //
