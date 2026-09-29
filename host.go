@@ -236,7 +236,8 @@ func (p *Peer) AddPubSubTopic(
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
 		res, err := handler(from.String(), topic, msg)
 		// A reply sent before this node can reach the asker is lost, so wait
-		// until it can.
+		// until it can. Only when there is data to send: many senders never
+		// listen for replies, and an asker that misses an error just times out.
 		if res != nil {
 			p.waitForReplyRoute(topic, from)
 		}
