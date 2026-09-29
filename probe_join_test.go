@@ -87,7 +87,7 @@ func TestProbe_SubscribeRacesDirectPublish(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			if _, err := n.publishToTopic(ctx, topic, []byte("x")); err != nil {
+			if _, err := n.publishToTopic(ctx, topic, []byte("x"), func() {}); err != nil {
 				mu.Lock()
 				pubErrs++
 				mu.Unlock()
@@ -132,7 +132,7 @@ func TestProbe_NoDeadlockUnderMixedLoad(t *testing.T) {
 					topic := fmt.Sprintf("mixed-%d", r%4)
 					switch w % 3 {
 					case 0:
-						n.publishToTopic(ctx, topic, []byte("x"))
+						n.publishToTopic(ctx, topic, []byte("x"), func() {})
 					case 1:
 						n.addPubSubTopic(topic, true, handler, nil)
 					case 2:

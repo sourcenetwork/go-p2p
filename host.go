@@ -234,7 +234,14 @@ func (p *Peer) AddPubSubTopic(
 	eventHandler PeerEventHandler,
 ) error {
 	messageHandler := func(from peer.ID, topic string, msg []byte) ([]byte, error) {
-		return handler(from.String(), topic, msg)
+		res, err := handler(from.String(), topic, msg)
+		// A reply sent before this node can reach the asker is lost, so wait
+		// until it can. Only when there is data to send: many senders never
+		// listen for replies, and an asker that misses an error just times out.
+		if res != nil {
+			p.waitForReplyRoute(topic, from)
+		}
+		return res, err
 	}
 	var eventHandlerWrapper func(from peer.ID, topic string, msg []byte)
 	if eventHandler != nil {
@@ -250,35 +257,70 @@ func (p *Peer) RemovePubSubTopic(topic string) error {
 	return p.removePubSubTopic(topic)
 }
 
+// TopicPeers returns the peers on the topic that this node can send to right
+// now. Waiting for a peer to show up here before sending to it keeps a message
+// sent right after connecting from being lost.
+func (p *Peer) TopicPeers(topic string) []string {
+	return p.topicPeers(topic)
+}
+
 // PublishToTopicAsync publishes the given data on the PubSub network via the
 // corresponding topic asynchronously.
 //
 // This is a non blocking operation.
 func (p *Peer) PublishToTopicAsync(ctx context.Context, topic string, data []byte) error {
-	_, err := p.publishToTopic(ctx, topic, data, rpc.WithIgnoreResponse(true))
+	// We don't use rpc.WithRepublishing here because nobody is waiting for the reply here
+	_, err := p.publishToTopic(ctx, topic, data, func() {}, rpc.WithIgnoreResponse(true))
 	return err
 }
 
 // PublishToTopic publishes the given data on the PubSub network via the
-// corresponding topic.
+// corresponding topic, and returns a channel that receives the replies.
+// Replies need the topic added with AddPubSubTopic first. Without that, the
+// data is sent once and the returned channel is nil.
 //
-// It will block until a response is received
+// The request is kept, and resent to peers that join the topic, until ctx
+// ends. A ctx without a deadline ends after defaultRequestTimeout.
 func (p *Peer) PublishToTopic(
 	ctx context.Context,
 	topic string,
 	data []byte,
 	withMultiResponse bool,
 ) (<-chan PubsubResponse, error) {
+	ctx, cancel := withRequestTimeout(ctx)
+	// A request sent before a peer joins the topic is lost, so resend it when
+	// one joins.
+	opts := []rpc.PublishOption{rpc.WithRepublishing(true)}
 	if withMultiResponse {
-		return p.publishToTopic(ctx, topic, data, rpc.WithMultiResponse(true))
+		opts = append(opts, rpc.WithMultiResponse(true))
 	}
-	return p.publishToTopic(ctx, topic, data)
+	resp, err := p.publishToTopic(ctx, topic, data, cancel, opts...)
+	if resp == nil {
+		// Nothing is forwarding replies, so nothing else will end ctx.
+		cancel()
+	}
+	return resp, err
 }
 
+// defaultRequestTimeout ends a request whose ctx has no deadline. Without it,
+// a caller that never ends ctx keeps the request, and its resends, forever.
+const defaultRequestTimeout = 30 * time.Second
+
+// withRequestTimeout gives ctx a deadline of defaultRequestTimeout if it has
+// none.
+func withRequestTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, defaultRequestTimeout)
+}
+
+// publishToTopic calls done once it stops forwarding replies.
 func (p *Peer) publishToTopic(
 	ctx context.Context,
 	topic string,
 	data []byte,
+	done func(),
 	options ...rpc.PublishOption,
 ) (<-chan PubsubResponse, error) {
 	if p.ps == nil { // skip if we aren't running with a pubsub net
@@ -309,21 +351,33 @@ func (p *Peer) publishToTopic(
 		if resp != nil {
 			respChan := make(chan PubsubResponse)
 			go func() {
+				defer done()
+				// Read resp until it closes. Otherwise pubsub-rpc gets stuck and
+				// keeps resending the request forever.
+				defer func() {
+					for range resp {
+					}
+				}()
+				defer close(respChan)
 				for {
 					select {
 					case <-ctx.Done():
-						close(respChan)
 						return
 					case r, ok := <-resp:
 						if !ok {
-							close(respChan)
 							return
 						}
-						respChan <- PubsubResponse{
+						// The caller may have stopped reading, so a reply must
+						// not block this past the end of ctx.
+						select {
+						case respChan <- PubsubResponse{
 							ID:   r.ID,
 							From: r.From.String(),
 							Data: r.Data,
 							Err:  r.Err,
+						}:
+						case <-ctx.Done():
+							return
 						}
 					}
 				}
