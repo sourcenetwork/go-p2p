@@ -28,19 +28,9 @@ import (
 // once that peer does.
 func TestPublishToTopic_PeerSubscribesAfterRequest_GetsReply(t *testing.T) {
 	ctx := context.Background()
-	newPeer := func() *Peer {
-		p, err := NewPeer(
-			ctx,
-			WithRootstore(memory.NewDatastore(ctx)),
-			WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
-			WithEnablePubSub(true),
-		)
-		require.NoError(t, err)
-		return p
-	}
-	requester := newPeer()
+	requester := newTestPeer(t, ctx)
 	defer requester.Close()
-	responder := newPeer()
+	responder := newTestPeer(t, ctx)
 	defer responder.Close()
 
 	addrs, err := responder.Addresses()
@@ -72,19 +62,9 @@ func TestPublishToTopic_PeerSubscribesAfterRequest_GetsReply(t *testing.T) {
 
 func TestTopicPeers_ListsSubscribedPeer(t *testing.T) {
 	ctx := context.Background()
-	newPeer := func() *Peer {
-		p, err := NewPeer(
-			ctx,
-			WithRootstore(memory.NewDatastore(ctx)),
-			WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
-			WithEnablePubSub(true),
-		)
-		require.NoError(t, err)
-		return p
-	}
-	a := newPeer()
+	a := newTestPeer(t, ctx)
 	defer a.Close()
-	b := newPeer()
+	b := newTestPeer(t, ctx)
 	defer b.Close()
 
 	addrs, err := b.Addresses()
@@ -106,19 +86,9 @@ func TestTopicPeers_ListsSubscribedPeer(t *testing.T) {
 // A request whose ctx has ended must not be resent to peers that join later.
 func TestPublishToTopic_CancelledRequest_IsNotResent(t *testing.T) {
 	ctx := context.Background()
-	newPeer := func() *Peer {
-		p, err := NewPeer(
-			ctx,
-			WithRootstore(memory.NewDatastore(ctx)),
-			WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
-			WithEnablePubSub(true),
-		)
-		require.NoError(t, err)
-		return p
-	}
-	requester := newPeer()
+	requester := newTestPeer(t, ctx)
 	defer requester.Close()
-	responder := newPeer()
+	responder := newTestPeer(t, ctx)
 	defer responder.Close()
 
 	addrs, err := responder.Addresses()
@@ -174,4 +144,16 @@ func TestWithRequestTimeout_WithDeadline_KeepsIt(t *testing.T) {
 
 	cancel()
 	require.Error(t, ctx.Err(), "cancel must still end the request")
+}
+
+// newTestPeer returns a peer with pubsub on, listening on a free local port.
+func newTestPeer(t *testing.T, ctx context.Context) *Peer {
+	p, err := NewPeer(
+		ctx,
+		WithRootstore(memory.NewDatastore(ctx)),
+		WithListenAddresses("/ip4/127.0.0.1/tcp/0"),
+		WithEnablePubSub(true),
+	)
+	require.NoError(t, err)
+	return p
 }
