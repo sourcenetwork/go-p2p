@@ -56,3 +56,10 @@ func TestWithResourceManager(t *testing.T) {
 	WithResourceManager(rm)(opts)
 	assert.Equal(t, rm, opts.ResourceManager)
 }
+
+func TestWithResourceLimits(t *testing.T) {
+	opts := &Options{}
+	limits := ResourceLimits{MaxMemory: 512 * 1024 * 1024, MaxFileDescriptors: 256}
+	WithResourceLimits(limits)(opts)
+	assert.Equal(t, limits, opts.ResourceLimits.Value())
+}
