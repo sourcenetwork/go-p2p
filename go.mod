@@ -17,7 +17,7 @@ require (
 	github.com/sourcenetwork/corekv/memory v0.3.1
 	github.com/sourcenetwork/corekv/namespace v0.3.1
 	github.com/sourcenetwork/corelog v0.0.8
-	github.com/sourcenetwork/go-libp2p-pubsub-rpc v0.0.15
+	github.com/sourcenetwork/go-libp2p-pubsub-rpc v0.0.17
 	github.com/sourcenetwork/immutable v0.3.0
 	github.com/stretchr/testify v1.11.1
 )
